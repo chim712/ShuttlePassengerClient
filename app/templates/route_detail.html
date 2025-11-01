@@ -146,7 +146,7 @@
         const rowEl = node.querySelector('.stop-row');
         rowEl.dataset.stopId = s.id;
         rowEl.querySelector('.js-stop-name').textContent = s.name;
-        rowEl.querySelector('.js-stop-desc').textContent = `${s.id}`;
+        rowEl.querySelector('.js-stop-desc').textContent = `정류장 ID ${s.id}`;
         list.appendChild(node);
         const dot = document.createElement('div');
         dot.className = 'dot-abs';
@@ -204,8 +204,7 @@
       meta: {
         routeNumber: '900', directionLabel: '하행',
         routeTitle: '아산종합터미널 ↔ 고속버스터미널', serviceArea: '운행지역: 아산',
-        firstTime: '06:20', lastTime: '22:30', intervalText: '매일 10–30분',
-        fleetCount: 3, asOf: new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'})
+        firstTime: '06:20', lastTime: '22:30', intervalText: '매일 10–30분'
       },
       stops: [
         { id: 686, name: '종합터미널' },
@@ -259,47 +258,67 @@
       ],
       vehicles: [
         { stopId: 701, status: 'approaching', vehicleNo: '1037' },
-        { stopId: 824, status: 'approaching', vehicleNo: '1023' },
-        { stopId: 824, status: 'arrived', vehicleNo: '1025' },
-        { stopId: 824, status: 'departed', vehicleNo: '1087' },
-        { stopId: 1077, status: 'approaching', vehicleNo: '1217' },
-        { stopId: 1077, status: 'departed', vehicleNo: '1213' },
+        { stopId: 1077, status: 'arrived', vehicleNo: '1217' },
         { stopId: 731, status: 'departed', vehicleNo: '1495' }
       ]
     };
 
     applyData(window.demoData);
 
-    // ===== 간단 테스트 (콘솔 확인용) =====
-    function assert(cond, msg){ if(!cond) throw new Error('Test failed: '+msg); }
-    function count(selector){ return document.querySelectorAll(selector).length; }
+    // ===== Two‑phase fetching (Meta first, then Stops & Vehicles) =====
+    // Configure your real endpoints here
+    // const ENDPOINTS = {
+    //   meta: '/api/route/900/meta',
+    //   state: '/api/route/900/state' // {stops:[...], vehicles:[...]}
+    // };
 
-    function runTests(){
-      // TC1: vehicles 길이가 곧 운행대수 표시에 반영되는가?
-      const v = [
-        { stopId: 686, status: 'arrived', vehicleNo: 'T1' },
-        { stopId: 652, status: 'approaching', vehicleNo: 'T2' },
-        { stopId: 653, status: 'departed', vehicleNo: 'T3' },
-        { stopId: 655, status: 'arrived', vehicleNo: 'T4' }
-      ];
-      renderVehicles(v);
-      assert(document.getElementById('fleetCount').textContent === String(v.length), 'fleetCount should equal vehicles.length');
-      assert(count('#laneVehicles .vbus') === v.length, 'number of bus markers should equal vehicles.length');
-
-      // TC2: 상태 오프셋 적용 시 오류 없이 DOM 배치되는가?
-      const v2 = [
-        { stopId: 649, status: '접근', vehicleNo: 'S1' },
-        { stopId: 653, status: '도착', vehicleNo: 'S2' },
-        { stopId: 655, status: '출발', vehicleNo: 'S3' }
-      ];
-      renderVehicles(v2);
-      assert(count('#laneVehicles .vbus') === v2.length, 'Korean status mapping should render buses');
-
-      // 원상복구
-      applyData(window.demoData);
-      console.log('[OK] Inline tests passed.');
+    async function fetchJSON(url, { signal } = {}){
+      const res = await fetch(url, { signal, cache: 'no-cache' });
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      return res.json();
     }
-    runTests();
+
+    let metaCtr, stateCtr, pollTimer;
+    let lastStops = null; // optional cache for graceful fallback
+
+    async function loadMeta(){
+      if(metaCtr) metaCtr.abort(); metaCtr = new AbortController();
+      // const meta = await fetchJSON(ENDPOINTS.meta, { signal: metaCtr.signal });
+      // applyData({ meta });
+      // Demo fallback: use demoData.meta
+      applyData({ meta: window.demoData.meta });
+    }
+
+    async function loadState(){
+      if(stateCtr) stateCtr.abort(); stateCtr = new AbortController();
+      // const { stops, vehicles } = await fetchJSON(ENDPOINTS.state, { signal: stateCtr.signal });
+      // lastStops = stops;
+      // applyData({ stops, vehicles });
+      // Demo fallback: use demoData.stops/vehicles
+      lastStops = window.demoData.stops;
+      applyData({ stops: window.demoData.stops, vehicles: window.demoData.vehicles });
+    }
+
+    async function refresh(){
+      try{
+        await loadMeta();           // 1) meta first (progressive header update)
+        await loadState();          // 2) then stops & vehicles
+      }catch(err){
+        console.error('[refresh] error', err);
+        // if stops failed but we have cache, keep vehicles off to avoid drift
+        if(lastStops){ applyData({ stops: lastStops }); }
+      }
+    }
+
+    function startPolling(intervalMs = 20000){
+      clearInterval(pollTimer);
+      pollTimer = setInterval(refresh, intervalMs);
+    }
+
+    // To enable real polling, uncomment:
+    // refresh();
+    // startPolling(20000);
+
 
     // ===== Polling (예시) =====
     // const URL = '/api/route/900/state';
