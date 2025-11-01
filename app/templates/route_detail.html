@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>버스 위치정보 – 900</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --muted: #5b6478;
+      --text: #0c1222;
+      --accent: #3367ff;
+      --line: #d7dbe7;
+      --dot: #b7c0d0;
+      --divider: #e6e9f2;
+      --shadow: 0 6px 16px rgba(14, 22, 42, 0.08);
+      --radius: 16px;
+      --row: 56px;
+    }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif; color: var(--text); background: var(--bg); }
+    .page { max-width: 480px; margin: 0 auto; padding: 16px; }
+
+    /* Header & Meta */
+    .header{display:flex; align-items:center; gap:12px; margin-bottom:10px}
+    .route-pill{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background:#eef2ff; color:#2443aa; box-shadow:var(--shadow)}
+    .route-pill .badge{display:grid; place-items:center; width:50px; height:28px; border-radius:8px; background:var(--accent); color:#fff; font-weight:700}
+    .header-title{display:flex; flex-direction:column; gap:2px}
+    .header-title .main{font-size:118px; font-weight:700}
+    .header-title .sub{font-size:12px; color:var(--muted)}
+
+    .meta{background:var(--card); border-radius:var(--radius); padding:12px; box-shadow:var(--shadow); display:grid; grid-template-columns:1fr 1fr; row-gap:8px; column-gap:8px; margin-bottom:10px; border:1px solid var(--divider)}
+    .meta .item{font-size:12px; color:var(--muted)}
+    .meta .item b{color:var(--text); font-weight:600}
+    .meta .span-2{grid-column:1 / -1}
+
+    .status{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:6px 2px 12px; font-size:12px; color:var(--muted) }
+
+    /* Board */
+    /* Board */
+    .board { display: grid; grid-template-columns: 72px 1fr; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--divider); overflow: hidden; }
+    .lane { position: relative; }
+    .line { position: absolute; left: 56px; top: 0; bottom: 0; width: 2px; background: var(--line); }
+    .dot-abs { position: absolute; left: 49px; width: 16px; height: 16px; border-radius: 50%; background: var(--dot); box-shadow: 0 0 0 3px var(--card); }
+    .vbus { position: absolute; left: 46px; width: 22px; height: 22px; border-radius: 6px; background: var(--accent); box-shadow: 0 6px 14px rgba(51, 103, 255, 0.35); }
+    .vehno { position: absolute; left: 6px; font-size: 12px; line-height: 1; color: var(--muted); font-weight: 700; }
+
+    .stop-list {
+      border-left: 1px solid var(--divider);
+      /* 각 행 높이 var(--row) 기준으로 구분선을 그려 누적 오차 제거 */
+      background:
+        repeating-linear-gradient(
+          to bottom,
+          transparent 0,
+          transparent calc(var(--row) - 1px),
+          var(--divider) calc(var(--row) - 1px),
+          var(--divider) var(--row)
+        );
+    }
+
+    /* 행 높이는 그대로 유지, border-bottom 은 사용하지 않음 */
+    .stop-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      height: var(--row);
+    }
+    .title { font-size: 14px; font-weight: 600; }
+    .desc { font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <!-- Header -->
+    <section class="header" aria-label="노선 정보">
+      <div class="route-pill" aria-label="노선 번호">
+        <span class="badge" id="routeNumber">900</span>
+        <span id="directionLabel">하행</span>
+      </div>
+      <div class="header-title">
+        <div class="main" id="routeTitle">아산 · 종합터미널 ↔ 고속버스터미널</div>
+        <div class="sub" id="serviceArea">운행지역: 아산</div>
+      </div>
+    </section>
+
+    <!-- Meta -->
+    <section class="meta" aria-label="운행 메타 정보">
+      <div class="item"><b>첫차</b> <span id="firstTime">–</span></div>
+      <div class="item"><b>막차</b> <span id="lastTime">–</span></div>
+      <div class="item span-2"><b>배차간격</b> <span id="intervalText">–</span></div>
+    </section>
+
+    <!-- Status Bar -->
+    <div class="status" aria-live="polite">
+      <div class="left"><span id="fleetCount">0</span>대 운행 중</div>
+      <div class="right">기준: <span id="asOf">-</span></div>
+    </div>
+
+    <!-- Board (lane + stops) -->
+    <section class="board" aria-label="정류장 및 차량 차선">
+      <div class="lane">
+        <div class="line"></div>
+        <div id="laneDots"></div>
+        <div id="laneVehicles"></div>
+      </div>
+      <div class="stop-list" id="stopList"></div>
+    </section>
+  </main>
+
+  <template id="tpl-stop">
+    <div class="stop-row">
+      <div class="info">
+        <div class="title js-stop-name"></div>
+        <div class="desc js-stop-desc"></div>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    const $ = (sel, root = document) => root.querySelector(sel);
+    const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+
+    function renderMeta(meta){
+      if(!meta) return;
+      if(meta.routeNumber!==undefined) $('#routeNumber').textContent = meta.routeNumber;
+      if(meta.directionLabel!==undefined) $('#directionLabel').textContent = meta.directionLabel;
+      if(meta.routeTitle!==undefined) $('#routeTitle').textContent = meta.routeTitle;
+      if(meta.serviceArea!==undefined) $('#serviceArea').textContent = meta.serviceArea;
+      if(meta.firstTime!==undefined) $('#firstTime').textContent = meta.firstTime;
+      if(meta.lastTime!==undefined) $('#lastTime').textContent = meta.lastTime;
+      if(meta.intervalText!==undefined) $('#intervalText').textContent = meta.intervalText;
+      if(meta.fleetCount!==undefined) $('#fleetCount').textContent = meta.fleetCount;
+      if(meta.asOf!==undefined) $('#asOf').textContent = meta.asOf;
+    }
+
+    function renderStops(stops) {
+      const list = $('#stopList');
+      const dots = $('#laneDots');
+      list.innerHTML = '';
+      dots.innerHTML = '';
+      const tpl = $('#tpl-stop');
+      const row = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--row')) || 56;
+      stops.forEach((s, i) => {
+        const node = tpl.content.cloneNode(true);
+        const rowEl = node.querySelector('.stop-row');
+        rowEl.dataset.stopId = s.id;
+        rowEl.querySelector('.js-stop-name').textContent = s.name;
+        rowEl.querySelector('.js-stop-desc').textContent = `${s.id}`;
+        list.appendChild(node);
+        const dot = document.createElement('div');
+        dot.className = 'dot-abs';
+        dot.style.top = `calc(${i} * var(--row) + (var(--row)/2) - 8px)`;
+        dots.appendChild(dot);
+      });
+      $('.lane').style.height = `calc(${stops.length} * var(--row))`;
+    }
+
+    function clearVehicles() {
+      $('#laneVehicles').innerHTML = '';
+      $$('.vehno').forEach(el => el.remove());
+    }
+
+    function renderVehicles(vehicles) {
+      clearVehicles();
+      const lv = $('#laneVehicles');
+      const row = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--row')) || 56;
+      const stopIndexById = new Map();
+      $$('#stopList .stop-row').forEach((el, idx) => {
+        stopIndexById.set(parseInt(el.dataset.stopId), idx);
+      });
+      vehicles.forEach(v => {
+        const idx = stopIndexById.get(parseInt(v.stopId));
+        if (idx === undefined) return;
+        const base = idx * row + row / 2;
+        const status = (v.status || '').toLowerCase();
+        const offset = status === 'approaching' || status === '접근' ? -18 : status === 'departed' || status === '출발' ? 18 : 0;
+        const bus = document.createElement('div');
+        bus.className = 'vbus';
+        bus.style.top = `${base + offset - 11}px`;
+        lv.appendChild(bus);
+        const label = document.createElement('span');
+        label.className = 'vehno';
+        label.textContent = v.vehicleNo || '';
+        label.style.top = `${base + offset - 7}px`;
+        label.dataset.stop = v.stopId;
+        $('.lane').appendChild(label);
+      });
+    }
+
+    function applyData({ meta, stops, vehicles } = {}) {
+      if (meta) renderMeta(meta);
+      if (stops) renderStops(stops);
+      if (vehicles) renderVehicles(vehicles);
+    }
+
+    window.demoData = {
+      meta: {
+        routeNumber: '720-1', directionLabel: '하행',
+        routeTitle: '아산 · 종합터미널 ↔ 고속버스터미널', serviceArea: '운행지역: 아산',
+        firstTime: '06:20', lastTime: '22:30', intervalText: '매일 10–30분',
+        fleetCount: 3, asOf: new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'})
+      },
+      stops: [
+        { id: 686, name: '종합터미널' },
+        { id: 649, name: '방죽안오거리' },
+        { id: 652, name: '복자여자중고등학교' },
+        { id: 653, name: '삼도상가' },
+        { id: 655, name: '천안역 동부광장' },
+        { id: 659, name: '온양나드리' },
+        { id: 661, name: '남산중앙시장' },
+        { id: 675, name: '남산축협' },
+        { id: 701, name: '남부오거리' },
+        { id: 832, name: '일봉초등학교' },
+        { id: 835, name: '다가동신성이아파트' },
+        { id: 837, name: '충무병원' },
+        { id: 828, name: '쌍용동 이마트' },
+        { id: 827, name: '이화여성병원' },
+        { id: 824, name: '쌍용역예빌병원계룡아파트' },
+        { id: 853, name: '삼일원앙아파트' },
+        { id: 166, name: '쌍용동일하이빌' },
+        { id: 2224, name: '앙감마을 이순신고등학교' },
+        { id: 1077, name: '쑥고개' },
+        { id: 2179, name: '신한아파트' },
+        { id: 10902, name: '와노타워' },
+        { id: 10816, name: '엘피오아산탕정 세교초' },
+        { id: 10804, name: 'LH 7단지아파트' },
+        { id: 1029, name: '호서웨딩프라자 건너' },
+        { id: 10896, name: '더샵센트로아파트 건너' },
+        { id: 1663, name: '중앙하이츠3차 건너' },
+        { id: 1030, name: '북수3리' },
+        { id: 10739, name: '배방환승정류장 남문' },
+        { id: 962, name: '모산' },
+        { id: 963, name: '오륙동 아산세무서 건너' },
+        { id: 964, name: '장호빌딩' },
+        { id: 2190, name: '배방읍 행정복지센터 건너' },
+        { id: 1553, name: '배방호성해링턴아파트' },
+        { id: 883, name: '공수4리' },
+        { id: 880, name: '신흥다세대' },
+        { id: 1490, name: '구령1리 건너' },
+        { id: 946, name: '신동' },
+        { id: 953, name: '모종2통' },
+        { id: 1546, name: '이마트 아산점 건너' },
+        { id: 10499, name: '아산충무병원 앞' },
+        { id: 350, name: '둔신초등학교' },
+        { id: 710, name: '온양여중고 입구 건너' },
+        { id: 711, name: '송악사거리 건너' },
+        { id: 731, name: '온양온천초교' },
+        { id: 744, name: '온양온천역 유웰시티' },
+        { id: 737, name: '아고사거리 건너' },
+        { id: 738, name: '한올고등학교 건너' },
+        { id: 10624, name: '고속버스터미널' }
+      ],
+      vehicles: [
+        { stopId: 701, status: 'approaching', vehicleNo: '1037' },
+        { stopId: 1077, status: 'arrived', vehicleNo: '1217' },
+        { stopId: 731, status: 'departed', vehicleNo: '1495' }
+      ]
+    };
+
+    applyData(window.demoData);
+  </script>
+</body>
+</html>
