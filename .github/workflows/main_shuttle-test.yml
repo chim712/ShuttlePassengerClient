@@ -63,23 +63,14 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_886F5FEDD7C746D69B5B57FA0699B484 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_710FCD7505FA4F40A06494F09A52AC7C }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_72D38F5804834EB59E2654791C067E9F }}
-
-      - name: Azure whoami
-        run: |
-          az account show
-
-      - name: Can I see the webapp?
-        run: |
-          az webapp show -n shuttle-test -g "FisrtImpact"
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_049FF56D08D44299B3BEDE62C68B61EE }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_D92FE7D2F955496DA9C4CB281FBFE21D }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_34680B01F6F54EC8ABF10B42A5D59C71 }}
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
           app-name: 'shuttle-test'
-          resource-group-name: 'FirstImpact'
-          package: .
+          slot-name: 'Production'
           
