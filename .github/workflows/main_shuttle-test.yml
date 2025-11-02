@@ -73,13 +73,13 @@ jobs:
 
       - name: Can I see the webapp?
         run: |
-          az webapp show -n shuttle-test -g "Second-Impact"
+          az webapp show -n shuttle-test -g "FisrtImpact"
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
           app-name: 'shuttle-test'
-          resource-group-name: 'Second-Impact'
+          resource-group-name: 'FirstImpact'
           package: .
           

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>노선 선택</title>
+  <style>
+    :root {
+      --fg:#111; --sub:#666; --bg:#fff;
+      --card:#f7f7f7; --border:#e6e6e6;
+    }
+    * { box-sizing:border-box; }
+    html,body {
+      margin:0; padding:0;
+      color:var(--fg); background:var(--bg);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Pretendard,sans-serif;
+    }
+    .page-header {
+      position:sticky; top:0; z-index:10;
+      background:var(--bg); border-bottom:1px solid var(--border);
+      padding:12px 16px;
+    }
+    .page-header h1 {
+      margin:0; font-size:18px;
+    }
+    .list-wrap {
+      padding:8px 12px;
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+      gap:10px;
+    }
+    .route-card {
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:14px;
+      cursor:pointer;
+      transition:transform .06s ease, box-shadow .06s ease;
+    }
+    .route-card:hover {
+      transform:translateY(-1px);
+      box-shadow:0 2px 10px rgba(0,0,0,.06);
+    }
+    .line {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom:6px;
+    }
+    .tag {
+      display:inline-block;
+      font-size:12px;
+      font-weight:700;
+      border-radius:6px;
+      padding:3px 8px;
+    }
+    .tag-up { background:#e8f2ff; color:#0b62d6; }
+    .tag-down { background:#fff0f0; color:#c62828; }
+    .tag-circ { background:#eefaf1; color:#2e7d32; }
+    .tag-etc { background:#eee; color:#444; }
+    .rnum {
+      font-size:16px;
+      font-weight:700;
+    }
+    .title {
+      font-size:14px;
+      color:var(--fg);
+      line-height:1.3;
+      margin-top:2px;
+    }
+    .meta {
+      margin-top:6px;
+      color:var(--sub);
+      font-size:12px;
+    }
+    @media (max-width:420px) {
+      .list-wrap { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="page-header">
+    <h1>노선 선택</h1>
+  </header>
+
+  <main class="list-wrap">
+    {% for it in routes %}
+      {% set kind = (
+        '순환' if it.routeType == 'CIRCULATION'
+        else '상행' if it.routeType == 'ROUND_TRIP_UP'
+        else '하행' if it.routeType == 'ROUND_TRIP_DOWN'
+        else it.routeType
+      ) %}
+      {% set kindClass = (
+        'tag-circ' if it.routeType == 'CIRCULATION'
+        else 'tag-up' if it.routeType == 'ROUND_TRIP_UP'
+        else 'tag-down' if it.routeType == 'ROUND_TRIP_DOWN'
+        else 'tag-etc'
+      ) %}
+      <article class="route-card"
+               onclick="location.href='{{ jump_base.rstrip('/') }}/{{ it.routeId }}'"
+               aria-label="노선 {{ it.routeNumber }} - {{ it.routeTitle }}">
+        <div class="line">
+          <span class="tag {{ kindClass }}">{{ kind }}</span>
+          <span class="rnum">{{ it.routeNumber }}</span>
+        </div>
+        <div class="title">{{ it.routeTitle }}</div>
+        <div class="meta"><span class="rid">ID #{{ it.routeId }}</span></div>
+      </article>
+    {% endfor %}
+  </main>
+</body>
+</html>

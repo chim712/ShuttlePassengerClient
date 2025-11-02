@@ -86,13 +86,19 @@ async def home(request: Request) -> HTMLResponse:
 # (2) 기관 내 노선 목록: /{org}
 #   - 외부 REST 예시: GET /orgs/{org}/routes
 #   - 응답 예시: [{ "routeNo": "1501", "name": "저상 1501", "direction": "상행" }, ...]
-# @app.get("/{org}", response_class=HTMLResponse)
-# async def route_list(request: Request, org: str) -> HTMLResponse:
-#     #routes = await fetch_json(f"/orgs/{org}/routes")
-#     return templates.TemplateResponse(
-#         "route_list.html",
-#         {"request": request, "org": org}
-#     )
+@app.get("/route_list", response_class=HTMLResponse)
+async def route_list(request: Request, org: int) -> HTMLResponse:
+    #routes = await fetch_json(f"/orgs/{org}/routes")
+    routes = [
+        {"routeId": 102, "routeNumber": "1", "routeTitle": "학내순환(순환)", "routeType": "CIRCULATION"},
+        {"routeId": 191, "routeNumber": "1-1", "routeTitle": "학내순환(미디어랩스)", "routeType": "ROUND_TRIP_DOWN"},
+        {"routeId": 900, "routeNumber": "900", "routeTitle": "아산터미널-천안터미널", "routeType": "ROUND_TRIP_DOWN"},
+    ]
+    jump_base = f"/{org}"
+    return templates.TemplateResponse(
+        "route_list.html",
+        {"request": request, "routes": routes, "jump_base": jump_base},
+    )
 
 
 # (3) 노선 상세(정류소 목록): /{org}/{routeNo}
