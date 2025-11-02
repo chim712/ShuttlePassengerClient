@@ -146,7 +146,7 @@
         const rowEl = node.querySelector('.stop-row');
         rowEl.dataset.stopId = s.id;
         rowEl.querySelector('.js-stop-name').textContent = s.name;
-        rowEl.querySelector('.js-stop-desc').textContent = `${s.id}`;
+        rowEl.querySelector('.js-stop-desc').textContent = `정류장 ID ${s.id}`;
         list.appendChild(node);
         const dot = document.createElement('div');
         dot.className = 'dot-abs';
@@ -169,6 +169,7 @@
       $$('#stopList .stop-row').forEach((el, idx) => {
         stopIndexById.set(parseInt(el.dataset.stopId), idx);
       });
+
       vehicles.forEach(v => {
         const idx = stopIndexById.get(parseInt(v.stopId));
         if (idx === undefined) return;
@@ -186,6 +187,10 @@
         label.dataset.stop = v.stopId;
         $('.lane').appendChild(label);
       });
+
+      // 운행대수/기준시각 자동 갱신
+      $('#fleetCount').textContent = Array.isArray(vehicles) ? vehicles.length : 0;
+      $('#asOf').textContent = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
     }
 
     function applyData({ meta, stops, vehicles } = {}) {
@@ -194,12 +199,12 @@
       if (vehicles) renderVehicles(vehicles);
     }
 
+    // === 샘플 데이터(기존 동작 보존) ===
     window.demoData = {
       meta: {
         routeNumber: '900', directionLabel: '하행',
         routeTitle: '아산종합터미널 ↔ 고속버스터미널', serviceArea: '운행지역: 아산',
-        firstTime: '06:20', lastTime: '22:30', intervalText: '매일 10–30분',
-        fleetCount: 3, asOf: new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'})
+        firstTime: '06:20', lastTime: '22:30', intervalText: '매일 10–30분'
       },
       stops: [
         { id: 686, name: '종합터미널' },
@@ -259,6 +264,76 @@
     };
 
     applyData(window.demoData);
+
+    // ===== Two‑phase fetching (Meta first, then Stops & Vehicles) =====
+    // Configure your real endpoints here
+    // const ENDPOINTS = {
+    //   meta: '/api/route/900/meta',
+    //   state: '/api/route/900/state' // {stops:[...], vehicles:[...]}
+    // };
+
+    async function fetchJSON(url, { signal } = {}){
+      const res = await fetch(url, { signal, cache: 'no-cache' });
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      return res.json();
+    }
+
+    let metaCtr, stateCtr, pollTimer;
+    let lastStops = null; // optional cache for graceful fallback
+
+    async function loadMeta(){
+      if(metaCtr) metaCtr.abort(); metaCtr = new AbortController();
+      // const meta = await fetchJSON(ENDPOINTS.meta, { signal: metaCtr.signal });
+      // applyData({ meta });
+      // Demo fallback: use demoData.meta
+      applyData({ meta: window.demoData.meta });
+    }
+
+    async function loadState(){
+      if(stateCtr) stateCtr.abort(); stateCtr = new AbortController();
+      // const { stops, vehicles } = await fetchJSON(ENDPOINTS.state, { signal: stateCtr.signal });
+      // lastStops = stops;
+      // applyData({ stops, vehicles });
+      // Demo fallback: use demoData.stops/vehicles
+      lastStops = window.demoData.stops;
+      applyData({ stops: window.demoData.stops, vehicles: window.demoData.vehicles });
+    }
+
+    async function refresh(){
+      try{
+        await loadMeta();           // 1) meta first (progressive header update)
+        await loadState();          // 2) then stops & vehicles
+      }catch(err){
+        console.error('[refresh] error', err);
+        // if stops failed but we have cache, keep vehicles off to avoid drift
+        if(lastStops){ applyData({ stops: lastStops }); }
+      }
+    }
+
+    function startPolling(intervalMs = 20000){
+      clearInterval(pollTimer);
+      pollTimer = setInterval(refresh, intervalMs);
+    }
+
+    // To enable real polling, uncomment:
+    // refresh();
+    // startPolling(20000);
+
+
+    // ===== Polling (예시) =====
+    // const URL = '/api/route/900/state';
+    // let ctr;
+    // async function tick(){
+    //   try{
+    //     if(ctr) ctr.abort();
+    //     ctr = new AbortController();
+    //     const res = await fetch(URL, {signal: ctr.signal, cache: 'no-cache'});
+    //     if(!res.ok) throw new Error('HTTP '+res.status);
+    //     const data = await res.json();
+    //     applyData(data);
+    //   }catch(e){ if(e.name!=='AbortError') console.error(e); }
+    // }
+    // setInterval(tick, 20000); // 20초 갱신
   </script>
 </body>
 </html>
