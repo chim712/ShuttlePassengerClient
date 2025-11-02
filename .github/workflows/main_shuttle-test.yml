@@ -67,6 +67,14 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_710FCD7505FA4F40A06494F09A52AC7C }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_72D38F5804834EB59E2654791C067E9F }}
 
+      - name: Azure whoami
+        run: |
+          az account show
+
+      - name: Can I see the webapp?
+        run: |
+          az webapp show -n shuttle-test -g "초호기"
+
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
