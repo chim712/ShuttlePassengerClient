@@ -76,4 +76,5 @@ jobs:
         id: deploy-to-webapp
         with:
           app-name: 'shuttle-test'
+          resource-group-name: '초호기'
           
