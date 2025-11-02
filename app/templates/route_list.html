@@ -51,6 +51,7 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+      min-height: 120px;
     }
 
     a.card-link {
@@ -127,10 +128,22 @@
       color:var(--sub);
     }
 
+    /* 로딩/에러 */
+    .state {
+      font-size: 14px;
+      color: var(--sub);
+      padding: 16px 12px 6px;
+    }
+
     @media (min-width:600px) {
       .wrap { max-width:480px; }
     }
   </style>
+
+  <script>
+    // 서버에서 전달된 orgId
+    window.INIT_ORG_ID = "{{ orgId }}";
+  </script>
 </head>
 <body>
   <div class="wrap">
@@ -139,38 +152,111 @@
       <h1>노선 선택</h1>
     </header>
 
-    <main class="list-wrap">
-      {%- for it in routes -%}
-        {%- set kind = (
-            '순환' if it.routeType == 'CIRCULATION'
-            else '상행' if it.routeType == 'ROUND_TRIP_UP'
-            else '하행' if it.routeType == 'ROUND_TRIP_DOWN'
-            else it.routeType
-          )
-        -%}
-        {%- set kindClass = (
-            'tag-circ' if it.routeType == 'CIRCULATION'
-            else 'tag-up' if it.routeType == 'ROUND_TRIP_UP'
-            else 'tag-down' if it.routeType == 'ROUND_TRIP_DOWN'
-            else 'tag-etc'
-          )
-        -%}
-
-        <a class="card-link" href="{{ jump_base.rstrip('/') }}/{{ it.routeId }}"
-           aria-label="노선 {{ it.routeNumber }} - {{ it.routeTitle }}">
-          <article class="route-card">
-            <div class="left">
-              <span class="tag {{ kindClass }}">{{ kind }}</span>
-              <span class="rnum">{{ it.routeNumber }}</span>
-            </div>
-            <div class="right">
-              <div class="title">{{ it.routeTitle }}</div>
-              <div class="meta">ID #{{ it.routeId }}</div>
-            </div>
-          </article>
-        </a>
-      {%- endfor -%}
+    <main class="list-wrap" id="listWrap">
+      <div class="state" id="state">노선 목록을 불러오는 중…</div>
+      <!-- 동적 카드가 여기 렌더링됨 -->
     </main>
   </div>
+
+  <template id="tpl-card">
+    <a class="card-link" href="#">
+      <article class="route-card">
+        <div class="left">
+          <span class="tag"></span>
+          <span class="rnum"></span>
+        </div>
+        <div class="right">
+          <div class="title"></div>
+          <div class="meta"></div>
+        </div>
+      </article>
+    </a>
+  </template>
+
+  <script>
+    const $ = (s, r=document) => r.querySelector(s);
+
+    function parseOrgId(){
+      const fromServer = window.INIT_ORG_ID;
+      const qs = new URLSearchParams(location.search);
+      return fromServer || qs.get('orgId') || '1';
+    }
+    const orgId = parseOrgId();
+
+    function kindLabel(routeType){
+      switch(routeType){
+        case 'CIRCULATION': return {text:'순환', cls:'tag-circ'};
+        case 'ROUND_TRIP_UP': return {text:'상행', cls:'tag-up'};
+        case 'ROUND_TRIP_DOWN': return {text:'하행', cls:'tag-down'};
+        default: return {text: routeType || '기타', cls:'tag-etc'};
+      }
+    }
+
+    async function fetchRoutes(){
+      const url = `/routes-data?orgId=${encodeURIComponent(orgId)}`;
+      const res = await fetch(url, {cache:'no-cache'});
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    }
+
+    function renderRoutes(routes){
+      const wrap = $('#listWrap');
+      wrap.innerHTML = ''; // 기존 상태 제거
+      const tpl = $('#tpl-card');
+
+      if(!Array.isArray(routes) || routes.length === 0){
+        const d = document.createElement('div');
+        d.className = 'state';
+        d.textContent = '표시할 노선이 없습니다.';
+        wrap.appendChild(d);
+        return;
+      }
+
+      routes.forEach(it => {
+        const node = tpl.content.cloneNode(true);
+        const tag = node.querySelector('.tag');
+        const rnum = node.querySelector('.rnum');
+        const title = node.querySelector('.title');
+        const meta = node.querySelector('.meta');
+        const a = node.querySelector('.card-link');
+
+        const kind = kindLabel(it.routeType);
+        tag.textContent = kind.text;
+        tag.classList.add(kind.cls);
+
+        rnum.textContent = it.routeNumber ?? '';
+        title.textContent = it.routeTitle ?? '';
+        meta.textContent = `ID #${it.routeId}`;
+
+        // 상세 페이지 경로: /{orgId}/{routeId}
+        a.href = `/${encodeURIComponent(orgId)}/${encodeURIComponent(it.routeId)}`;
+        a.setAttribute('aria-label', `노선 ${it.routeNumber ?? ''} - ${it.routeTitle ?? ''}`);
+
+        wrap.appendChild(node);
+      });
+    }
+
+    async function bootstrap(){
+      try{
+        const data = await fetchRoutes();
+        // 외부가 배열 또는 {routes:[...]} 모두 수용
+        const routes = Array.isArray(data) ? data : (Array.isArray(data.routes) ? data.routes : []);
+        renderRoutes(routes);
+      }catch(e){
+        console.error(e);
+        const st = $('#state');
+        if(st){
+          st.textContent = '노선 목록을 불러오지 못했습니다.';
+        }else{
+          const d = document.createElement('div');
+          d.className = 'state';
+          d.textContent = '노선 목록을 불러오지 못했습니다.';
+          $('#listWrap').prepend(d);
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', bootstrap);
+  </script>
 </body>
 </html>

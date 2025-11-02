@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>기관 선택</title>
+  <style>
+    /* 모바일 퍼스트 스타일 */
+    :root { --fg:#111; --sub:#666; --bg:#fff; --card:#f9f9f9; --border:#e6e6e6; }
+    * { box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin:0; padding:0;
+      color:var(--fg); background:var(--bg);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Apple SD Gothic Neo, Pretendard, sans-serif;
+    }
+
+    .wrap { max-width: 420px; margin: 0 auto; }
+
+    /* ---------- 상단 헤더 ---------- */
+    .page-header {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg); border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+    }
+    .page-header h1 {
+      margin: 0;
+      font-size: 18px;
+      text-align: center;
+      flex-grow: 1;
+    }
+
+    /* ---------- 리스트 영역 ---------- */
+    .list-wrap {
+      padding: 8px 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 120px;
+    }
+
+    a.card-link {
+      color: inherit;
+      text-decoration: none;
+      display: block;
+      width: 100%;
+    }
+
+    .org-card {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 12px;
+      min-height: 64px;
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: transform .06s ease, box-shadow .06s ease;
+    }
+    .org-card:active { transform: scale(0.99); }
+    .org-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+
+    /* ---------- 좌측 태그 ---------- */
+    .left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 110px;
+      flex-shrink: 0;
+    }
+    .tag {
+      display:inline-block;
+      font-size:11px;
+      font-weight:700;
+      border-radius:999px;
+      padding:4px 8px;
+      white-space:nowrap;
+    }
+    .tag-company { background:#e8f2ff; color:#0b62d6; } /* 회사 */
+    .tag-school  { background:#eefaf1; color:#2e7d32; } /* 학교 */
+    .tag-gov     { background:#fff4e5; color:#b95a00; } /* 관공서 */
+    .tag-etc     { background:#eee;    color:#444;    } /* 기타 */
+
+    /* ---------- 우측 텍스트 ---------- */
+    .right {
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      min-width:0;
+      flex:1;
+    }
+    .title {
+      font-size:17px;
+      font-weight: 600;
+      line-height:1.25;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .meta {
+      font-size:12px;
+      color:var(--sub);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+
+    /* 로딩/에러 */
+    .state {
+      font-size: 14px;
+      color: var(--sub);
+      padding: 16px 12px 6px;
+    }
+
+    @media (min-width:600px) {
+      .wrap { max-width:480px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="page-header">
+      <h1>기관 선택</h1>
+    </header>
+
+    <main class="list-wrap" id="listWrap">
+      <div class="state" id="state">기관 목록을 불러오는 중…</div>
+      <!-- 동적 카드가 여기 렌더링됨 -->
+    </main>
+  </div>
+
+  <template id="tpl-card">
+    <a class="card-link" href="#">
+      <article class="org-card">
+        <div class="left">
+          <span class="tag"></span>
+        </div>
+        <div class="right">
+          <div class="title"></div>
+          <div class="meta"></div>
+        </div>
+      </article>
+    </a>
+  </template>
+
+  <script>
+    const $ = (s, r=document) => r.querySelector(s);
+
+    /** 유형 → 라벨/클래스 매핑 */
+    function kindLabel(orgType){
+      switch(orgType){
+        case 'COMPANY': return {text:'회사',  cls:'tag-company'};
+        case 'SCHOOL':  return {text:'학교',  cls:'tag-school'};
+        case 'GOV':     return {text:'관공서', cls:'tag-gov'};
+        default:        return {text: orgType || '기타', cls:'tag-etc'};
+      }
+    }
+
+    /** 기관 목록 fetch
+     *  응답 포맷 예시:
+     *  [
+     *    { "orgId":101, "orgName":"순천향대학교", "region":"충남 아산", "orgType":"SCHOOL" },
+     *    { "orgId":202, "orgName":"SCH병원", "region":"충남 아산", "orgType":"GOV" }
+     *  ]
+     *  또는 { "orgs": [ ... ] }
+     */
+    async function fetchOrgs(){
+      const res = await fetch('/orgs-data', {cache:'no-cache'});
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    }
+
+    function renderOrgs(orgs){
+      const wrap = $('#listWrap');
+      wrap.innerHTML = ''; // 기존 상태 제거
+      const tpl = $('#tpl-card');
+
+      if(!Array.isArray(orgs) || orgs.length === 0){
+        const d = document.createElement('div');
+        d.className = 'state';
+        d.textContent = '표시할 기관이 없습니다.';
+        wrap.appendChild(d);
+        return;
+      }
+
+      orgs.forEach(it => {
+        const node = tpl.content.cloneNode(true);
+        const tag  = node.querySelector('.tag');
+        const title = node.querySelector('.title');
+        const meta  = node.querySelector('.meta');
+        const a     = node.querySelector('.card-link');
+
+        const kind = kindLabel(it.orgType);
+        tag.textContent = kind.text;
+        tag.classList.add(kind.cls);
+
+        title.textContent = it.orgName ?? '';
+
+        // 두 번째 줄: "지역 | ID: 101" (지역이 없으면 "ID: 101"만)
+        const region = (it.region ?? '').trim();
+        const idPart = (it.orgId !== undefined && it.orgId !== null) ? `ID: ${it.orgId}` : '';
+        meta.textContent = region && idPart ? `${region} | ${idPart}` : (region || idPart || '');
+
+        // 클릭 시 /routes?orgId={id}
+        if (it.orgId !== undefined && it.orgId !== null) {
+          a.href = `/routes?orgId=${encodeURIComponent(it.orgId)}`;
+          a.setAttribute('aria-label', `기관 ${it.orgName ?? ''} (ID ${it.orgId})`);
+        } else {
+          a.href = '#';
+        }
+
+        wrap.appendChild(node);
+      });
+    }
+
+    async function bootstrap(){
+      try{
+        const data = await fetchOrgs();
+        const orgs = Array.isArray(data) ? data : (Array.isArray(data.orgs) ? data.orgs : []);
+        renderOrgs(orgs);
+      }catch(e){
+        console.error(e);
+        const st = $('#state');
+        if(st){
+          st.textContent = '기관 목록을 불러오지 못했습니다.';
+        }else{
+          const d = document.createElement('div');
+          d.className = 'state';
+          d.textContent = '기관 목록을 불러오지 못했습니다.';
+          $('#listWrap').prepend(d);
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', bootstrap);
+  </script>
+</body>
+</html>
