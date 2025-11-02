@@ -77,4 +77,5 @@ jobs:
         with:
           app-name: 'shuttle-test'
           resource-group-name: '초호기'
+          package: .
           
