@@ -92,6 +92,11 @@ async def route_list(request: Request, org: int) -> HTMLResponse:
     routes = [
         {"routeId": 102, "routeNumber": "1", "routeTitle": "학내순환(순환)", "routeType": "CIRCULATION"},
         {"routeId": 191, "routeNumber": "1-1", "routeTitle": "학내순환(미디어랩스)", "routeType": "ROUND_TRIP_DOWN"},
+        {"routeId": 200, "routeNumber": "2", "routeTitle": "신창역 직행 (신창역행)", "routeType": "ROUND_TRIP_UP"},
+        {"routeId": 201, "routeNumber": "2", "routeTitle": "신창역 직행 (후문행)", "routeType": "ROUND_TRIP_DOWN"},
+        {"routeId": 282, "routeNumber": "2-2", "routeTitle": "학내순환 > 신창역", "routeType": "CIRCULATION"},
+        {"routeId": 292, "routeNumber": "2-1", "routeTitle": "신창역 > 학내순환", "routeType": "CIRCULATION"},
+        {"routeId": 302, "routeNumber": "3", "routeTitle": "신창역 휴일", "routeType": "CIRCULATION"},
         {"routeId": 900, "routeNumber": "900", "routeTitle": "아산터미널-천안터미널", "routeType": "ROUND_TRIP_DOWN"},
     ]
     jump_base = f"/{org}"

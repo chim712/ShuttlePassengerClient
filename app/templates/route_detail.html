@@ -6,44 +6,146 @@
   <title>버스 위치정보</title>
   <style>
     :root {
-      --bg: #f6f7fb; --card:#fff; --muted:#5b6478; --text:#0c1222; --accent:#3367ff;
-      --line:#d7dbe7; --dot:#b7c0d0; --divider:#e6e9f2; --shadow:0 6px 16px rgba(14,22,42,.08);
+      --bg:#f6f7fb; --card:#fff; --muted:#5b6478; --text:#0c1222; --accent:#3367ff;
+      --line:#d7dbe7; --dot:#b7c0d0; --divider:#e6e9f2;
+      --shadow:0 6px 16px rgba(14,22,42,.08);
       --radius:16px; --row:56px;
+      --fg:var(--text); --border:var(--divider);
     }
-    body{margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif; color:var(--text); background:var(--bg);}
-    .page{max-width:480px; margin:0 auto; padding:16px;}
-    .header{display:flex; align-items:center; gap:12px; margin-bottom:10px}
-    .route-pill{display:inline-flex; align-items:center; gap:8px; padding:5px 12px; border-radius:999px; background:#e0e6ea; color:#2443aa; box-shadow:var(--shadow)}
-    .route-pill .badge{display:grid; place-items:center; width:66px; height:36px; border-radius:8px; background:var(--accent); color:#fff; font-size:27px; font-weight:600}
-    .header-title{display:flex; flex-direction:column; gap:2px}
-    .header-title .main{font-size:18px; font-weight:700}
-    .header-title .sub{font-size:12px; color:var(--muted)}
-    .meta{background:var(--card); border-radius:var(--radius); padding:12px; box-shadow:var(--shadow); display:grid; grid-template-columns:1fr 1fr; row-gap:8px; column-gap:8px; margin-bottom:10px; border:1px solid var(--divider)}
-    .meta .item{font-size:12px; color:var(--muted)}
-    .meta .item b{color:var(--text); font-weight:600}
-    .meta .span-2{grid-column:1 / -1}
-    .status{display:flex; align-items:center; justify-content:space-between; gap:8px; margin:6px 2px 12px; font-size:12px; color:var(--muted)}
-    .board{display:grid; grid-template-columns:72px 1fr; background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); border:1px solid var(--divider); overflow:hidden}
-    .lane{position:relative}
-    .line{position:absolute; left:56px; top:0; bottom:0; width:2px; background:var(--line)}
-    .dot-abs{position:absolute; left:49px; width:16px; height:16px; border-radius:50%; background:var(--dot); box-shadow:0 0 0 3px var(--card)}
-    .vbus{position:absolute; left:46px; width:22px; height:22px; border-radius:6px; background:var(--accent); box-shadow:0 6px 14px rgba(51,103,255,.35)}
-    .vehno{position:absolute; left:6px; font-size:12px; line-height:1; color:var(--muted); font-weight:700}
-    .stop-list{border-left:1px solid var(--divider);
-      background:repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) - 1px), var(--divider) calc(var(--row) - 1px), var(--divider) var(--row))}
-    .stop-row{display:flex; align-items:center; gap:8px; padding:0 12px; height:var(--row)}
-    .title{font-size:15px; font-weight:660}
-    .desc{font-size:12px; color:var(--muted)}
+
+    body {
+      margin:0;
+      font-family:system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+      color:var(--text); background:var(--bg);
+    }
+
+    .page { max-width:480px; margin:0 auto; padding:16px; }
+
+    /* -------------------- 상단 헤더 -------------------- */
+    .page-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--card); /* ← 여기만 변경! 기존: var(--bg) */
+      border-bottom: 1px solid var(--border);
+    }
+    .header-inner {
+      max-width:480px; margin:0 auto;
+      position:relative;
+      display:flex; align-items:center; justify-content:center;
+      padding:12px 16px;
+    }
+    .page-header h1 {
+      margin:0;
+      font-size:18px;
+      text-align:center;
+      flex:1;
+    }
+    .back-btn {
+      position:absolute; left:16px; top:50%;
+      transform:translateY(-50%);
+      font-size:22px;
+      text-decoration:none;
+      color:var(--fg);
+      font-weight:600;
+      line-height:1;
+      padding:6px 8px;
+      border-radius:8px;
+      transition:background .1s ease;
+    }
+    .back-btn:active { background:rgba(0,0,0,0.08); }
+
+    /* -------------------- 상단 노선 헤더 -------------------- */
+    .header {display:flex; align-items:center; gap:12px; margin-bottom:10px;}
+    .route-pill {
+      display:inline-flex; align-items:center; gap:8px;
+      padding:5px 12px; border-radius:999px;
+      background:#e0e6ea; color:#2443aa; box-shadow:var(--shadow);
+    }
+    .route-pill .badge {
+      display:grid; place-items:center;
+      width:66px; height:36px; border-radius:8px;
+      background:var(--accent); color:#fff;
+      font-size:27px; font-weight:600;
+    }
+    .header-title { display:flex; flex-direction:column; gap:2px; }
+    .header-title .main { font-size:18px; font-weight:700; }
+    .header-title .sub  { font-size:12px; color:var(--muted); }
+
+    /* -------------------- 메타/상태 -------------------- */
+    .meta {
+      background:var(--card); border-radius:var(--radius);
+      padding:12px; box-shadow:var(--shadow);
+      display:grid; grid-template-columns:1fr 1fr;
+      row-gap:8px; column-gap:8px;
+      margin-bottom:10px; border:1px solid var(--divider);
+    }
+    .meta .item { font-size:12px; color:var(--muted); }
+    .meta .item b { color:var(--text); font-weight:600; }
+    .meta .span-2 { grid-column:1 / -1; }
+
+    .status {
+      display:flex; align-items:center; justify-content:space-between;
+      gap:8px; margin:6px 2px 12px;
+      font-size:12px; color:var(--muted);
+    }
+
+    /* -------------------- 메인 보드 -------------------- */
+    .board {
+      display:grid; grid-template-columns:72px 1fr;
+      background:var(--card); border-radius:var(--radius);
+      box-shadow:var(--shadow); border:1px solid var(--divider);
+      overflow:hidden;
+    }
+    .lane { position:relative; }
+    .line { position:absolute; left:56px; top:0; bottom:0; width:2px; background:var(--line); }
+    .dot-abs {
+      position:absolute; left:49px; width:16px; height:16px;
+      border-radius:50%; background:var(--dot);
+      box-shadow:0 0 0 3px var(--card);
+    }
+    .vbus {
+      position:absolute; left:46px;
+      width:22px; height:22px; border-radius:6px;
+      background:var(--accent);
+      box-shadow:0 6px 14px rgba(51,103,255,.35);
+    }
+    .vehno {
+      position:absolute; left:6px;
+      font-size:12px; line-height:1;
+      color:var(--muted); font-weight:700;
+    }
+    .stop-list {
+      border-left:1px solid var(--divider);
+      background:repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent calc(var(--row) - 1px),
+        var(--divider) calc(var(--row) - 1px),
+        var(--divider) var(--row)
+      );
+    }
+    .stop-row {
+      display:flex; align-items:center; gap:8px;
+      padding:0 12px; height:var(--row);
+    }
+    .title { font-size:15px; font-weight:660; }
+    .desc  { font-size:12px; color:var(--muted); }
   </style>
+
   <script>
-    // 서버가 path 파라미터로 주입한 초기값
-    window.INIT_CONFIG = {
-      orgId: "{{ orgId }}",
-      routeId: "{{ routeId }}"
-    };
+    window.INIT_CONFIG = { orgId: "{{ orgId }}", routeId: "{{ routeId }}" };
   </script>
 </head>
+
 <body>
+  <header class="page-header">
+    <div class="header-inner">
+      <a href="/route_list?org={{orgId}}" class="back-btn" aria-label="뒤로가기">〈</a>
+      <h1>차량 위치 정보</h1>
+    </div>
+  </header>
+
   <main class="page">
     <!-- Header -->
     <section class="header" aria-label="노선 정보">
@@ -91,216 +193,112 @@
   </template>
 
   <script>
-    // ========== 유틸 ==========
-    const $ = (sel, root = document) => root.querySelector(sel);
-    const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+    const $ = (sel, root=document) => root.querySelector(sel);
+    const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
 
-    // ✅ 견고한 파라미터 파서: 서버 주입 → 쿼리스트링(orgId/orgID, routeId/routeID) → 경로(/org/route) → 기본값
-    function parseConfig() {
-      const fromServer = window.INIT_CONFIG || {};
-      const sp = new URLSearchParams(location.search);
-
-      // 1) 서버 주입 우선
-      let orgId   = fromServer.orgId;
-      let routeId = fromServer.routeId;
-
-      // 2) 쿼리스트링 보완 (대/소문자 혼용 허용)
-      orgId   = orgId   ?? sp.get('orgId')   ?? sp.get('orgID');
-      routeId = routeId ?? sp.get('routeId') ?? sp.get('routeID');
-
-      // 3) 경로형 보완: /{org}/{route}
-      if (!orgId || !routeId) {
-        const parts = location.pathname.replace(/^\/+|\/+$/g, '').split('/');
-        if (parts.length >= 2) {
-          const candRoute = parts[parts.length - 1];
-          const candOrg   = parts[parts.length - 2];
-          orgId   = orgId   ?? candOrg;
-          routeId = routeId ?? candRoute;
-        }
-      }
-
-      // 4) 최종 기본값
-      orgId   = orgId   || '1';
-      routeId = routeId || '1';
-
-      return { orgId, routeId };
+    function parseConfig(){
+      const fromServer=window.INIT_CONFIG||{};
+      const sp=new URLSearchParams(location.search);
+      let orgId=fromServer.orgId??sp.get('orgId')??'1';
+      let routeId=fromServer.routeId??sp.get('routeId')??'1';
+      return {orgId,routeId};
     }
+    const {orgId,routeId}=parseConfig();
+    const credentials=(new URLSearchParams(location.search).get('cred')==='include')?'include':'same-origin';
+    let CONFIG={orgId,routeId,credentials};
 
-    const { orgId, routeId } = parseConfig();
-    const credParam = new URLSearchParams(location.search).get('cred');
-    const credentials = credParam === 'include' ? 'include' : 'same-origin';
-    
-    let CONFIG = { orgId, routeId, credentials };
-
-    // 요청 엔드포인트(쿼리스트링 방식)
-    function makeEndpoints({ orgId, routeId }) {
-      const qs = `?orgId=${encodeURIComponent(orgId)}&routeId=${encodeURIComponent(routeId)}`;
-      return {
-        meta:     `/meta${qs}`,
-        stops:    `/stops${qs}`,
-        vehicles: `/vehicles${qs}`
-      };
+    function makeEndpoints({orgId,routeId}){
+      const qs=`?orgId=${encodeURIComponent(orgId)}&routeId=${encodeURIComponent(routeId)}`;
+      return {meta:`/meta${qs}`,stops:`/stops${qs}`,vehicles:`/vehicles${qs}`};
     }
-    let ENDPOINTS = makeEndpoints(CONFIG);
-    
+    let ENDPOINTS=makeEndpoints(CONFIG);
 
-    // (선택) 네트워크 확인용 로그
-    console.debug('[INIT]', { orgId, routeId, ENDPOINTS });
-
-    // ========== 렌더러 ==========
-    function renderMeta(meta){
-      if(!meta) return;
-      if(meta.routeNumber!==undefined) $('#routeNumber').textContent = meta.routeNumber;
-      if(meta.directionLabel!==undefined) $('#directionLabel').textContent = meta.directionLabel;
-      if(meta.routeTitle!==undefined) $('#routeTitle').textContent = meta.routeTitle;
-      if(meta.serviceArea!==undefined) $('#serviceArea').textContent = meta.serviceArea;
-      if(meta.firstTime!==undefined) $('#firstTime').textContent = meta.firstTime;
-      if(meta.lastTime!==undefined) $('#lastTime').textContent = meta.lastTime;
-      if(meta.intervalText!==undefined) $('#intervalText').textContent = meta.intervalText;
-      if(meta.fleetCount!==undefined) $('#fleetCount').textContent = meta.fleetCount;
-      if(meta.asOf!==undefined) $('#asOf').textContent = meta.asOf;
-    }
-
-    function renderStops(stops) {
-      if(!Array.isArray(stops)) return;
-      const list = $('#stopList');
-      const dots = $('#laneDots');
-      list.innerHTML = '';
-      dots.innerHTML = '';
-      const tpl = $('#tpl-stop');
-      stops.forEach((s, i) => {
-        const node = tpl.content.cloneNode(true);
-        const rowEl = node.querySelector('.stop-row');
-        rowEl.dataset.stopId = s.id;
-        rowEl.querySelector('.js-stop-name').textContent = s.name ?? '';
-        rowEl.querySelector('.js-stop-desc').textContent = s.desc ?? `정류장 ID ${s.id}`;
-        list.appendChild(node);
-        const dot = document.createElement('div');
-        dot.className = 'dot-abs';
-        dot.style.top = `calc(${i} * var(--row) + (var(--row)/2) - 8px)`;
-        dots.appendChild(dot);
-      });
-      $('.lane').style.height = `calc(${stops.length} * var(--row))`;
-    }
-
-    function clearVehicles() {
-      $('#laneVehicles').innerHTML = '';
-      $$('.vehno').forEach(el => el.remove());
-    }
-
-    function renderVehicles(vehicles) {
-      if(!Array.isArray(vehicles)) return;
-      clearVehicles();
-      const lv = $('#laneVehicles');
-      const stopIndexById = new Map();
-      $$('#stopList .stop-row').forEach((el, idx) => stopIndexById.set(parseInt(el.dataset.stopId), idx));
-      const row = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--row')) || 56;
-
-      vehicles.forEach(v => {
-        const idx = stopIndexById.get(parseInt(v.stopId));
-        if (idx === undefined) return;
-        const base = idx * row + row / 2;
-        const status = (v.status || '').toLowerCase();
-        const offset =
-          status === 'APPROACH' || status === '접근' ? -18 :
-          status === 'DEPARTURE'   || status === '출발' ?  18 : 0;
-
-        const bus = document.createElement('div');
-        bus.className = 'vbus';
-        bus.style.top = `${base + offset - 11}px`;
-        lv.appendChild(bus);
-
-        const label = document.createElement('span');
-        label.className = 'vehno';
-        label.textContent = v.vehicleNo || '';
-        label.style.top = `${base + offset - 7}px`;
-        label.dataset.stop = v.stopId;
-        $('.lane').appendChild(label);
-      });
-
-      $('#fleetCount').textContent = vehicles.length;
-      $('#asOf').textContent = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
-    }
-
-    function applyData({ meta, stops, vehicles } = {}) {
-      if (meta) renderMeta(meta);
-      if (stops) renderStops(stops);
-      if (vehicles) renderVehicles(vehicles);
-    }
-
-    // ========== fetch 유틸 ==========
-    async function fetchJSON(url, { signal } = {}){
-      const res = await fetch(url, { signal, cache:'no-cache', credentials: CONFIG.credentials });
-      if(!res.ok) throw new Error(`HTTP ${res.status} @ ${url}`);
+    async function fetchJSON(url,{signal}={}) {
+      const res=await fetch(url,{signal,cache:'no-cache',credentials:CONFIG.credentials});
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     }
 
-    // ========== 로더 & 폴링 ==========
-    let metaCtr, stopsCtr, vehiclesCtr, pollTimer;
-    let lastStops = null;
-
-    async function loadMeta() {
-      if (metaCtr) metaCtr.abort();
-      metaCtr = new AbortController();
-      try {
-        const meta = await fetchJSON(ENDPOINTS.meta, { signal: metaCtr.signal });
-        applyData({ meta });
-      } catch (err) { console.error('[loadMeta]', err); }
+    function renderMeta(m){
+      if(!m) return;
+      $('#routeNumber').textContent=m.routeNumber??'–';
+      $('#directionLabel').textContent=m.directionLabel??'–';
+      $('#routeTitle').textContent=m.routeTitle??'–';
+      $('#serviceArea').textContent=m.serviceArea??'–';
+      $('#firstTime').textContent=m.firstTime??'–';
+      $('#lastTime').textContent=m.lastTime??'–';
+      $('#intervalText').textContent=m.intervalText??'–';
+      $('#fleetCount').textContent=m.fleetCount??'–';
+      $('#asOf').textContent=m.asOf??'–';
     }
 
-    async function loadStops() {
-      if (stopsCtr) stopsCtr.abort();
-      stopsCtr = new AbortController();
-      try {
-        const data = await fetchJSON(ENDPOINTS.stops, { signal: stopsCtr.signal });
-        // 서버가 {stops:[...]} 또는 [...] 둘 다 허용
-        const stops = Array.isArray(data) ? data : data.stops;
-        lastStops = stops ?? null;
-        applyData({ stops });
-      } catch (err) { console.error('[loadStops]', err); }
+    function renderStops(stops){
+      if(!Array.isArray(stops)) return;
+      const list=$('#stopList'), dots=$('#laneDots');
+      list.innerHTML=''; dots.innerHTML='';
+      const tpl=$('#tpl-stop');
+      stops.forEach((s,i)=>{
+        const node=tpl.content.cloneNode(true);
+        node.querySelector('.js-stop-name').textContent=s.name??'';
+        node.querySelector('.js-stop-desc').textContent=s.desc??`정류장 ID ${s.id}`;
+        node.querySelector('.stop-row').dataset.stopId=s.id;
+        list.appendChild(node);
+        const dot=document.createElement('div');
+        dot.className='dot-abs';
+        dot.style.top=`calc(${i} * var(--row) + (var(--row)/2) - 8px)`;
+        dots.appendChild(dot);
+      });
+      $('.lane').style.height=`calc(${stops.length} * var(--row))`;
     }
 
-    async function loadVehicles() {
-      if (vehiclesCtr) vehiclesCtr.abort();
-      vehiclesCtr = new AbortController();
-      try {
-        const data = await fetchJSON(ENDPOINTS.vehicles, { signal: vehiclesCtr.signal });
-        const vehicles = Array.isArray(data) ? data : data.vehicles;
-        applyData({ vehicles });
-      } catch (err) { console.error('[loadVehicles]', err); /* 정류장 캐시만 유지 */ }
+    function renderVehicles(vehicles){
+      if(!Array.isArray(vehicles)) return;
+      $('#laneVehicles').innerHTML='';
+      $$('.vehno').forEach(el=>el.remove());
+      const lv=$('#laneVehicles');
+      const stopIndexById=new Map();
+      $$('#stopList .stop-row').forEach((el,idx)=>stopIndexById.set(parseInt(el.dataset.stopId),idx));
+      const row=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--row'))||56;
+
+      vehicles.forEach(v=>{
+        const idx=stopIndexById.get(parseInt(v.stopId));
+        if(idx===undefined) return;
+        const base=idx*row+row/2;
+        const status=(v.status||'').toLowerCase();
+        const offset=status==='approach'||status==='접근'?-18:status==='departure'||status==='출발'?18:0;
+
+        const bus=document.createElement('div');
+        bus.className='vbus';
+        bus.style.top=`${base+offset-11}px`;
+        lv.appendChild(bus);
+
+        const label=document.createElement('span');
+        label.className='vehno';
+        label.textContent=v.vehicleNo||'';
+        label.style.top=`${base+offset-7}px`;
+        $('.lane').appendChild(label);
+      });
+
+      $('#fleetCount').textContent=vehicles.length;
+      $('#asOf').textContent=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
     }
 
-    async function bootstrap() {
-      await loadMeta();
-      await loadStops();
-      await loadVehicles();
-    }
+    async function loadMeta(){ try{ renderMeta(await fetchJSON(ENDPOINTS.meta)); }catch(e){console.error(e);} }
+    async function loadStops(){ try{
+      const data=await fetchJSON(ENDPOINTS.stops);
+      renderStops(Array.isArray(data)?data:data.stops);
+    }catch(e){console.error(e);} }
+    async function loadVehicles(){ try{
+      const data=await fetchJSON(ENDPOINTS.vehicles);
+      renderVehicles(Array.isArray(data)?data:data.vehicles);
+    }catch(e){console.error(e);} }
 
-    function startPolling(ms = 20000){
-      clearInterval(pollTimer);
-      pollTimer = setInterval(loadVehicles, ms);
-    }
+    async function bootstrap(){ await loadMeta(); await loadStops(); await loadVehicles(); }
+    function startPolling(ms=20000){ setInterval(loadVehicles,ms); }
 
-    // ========== 라우트 전환(옵션) ==========
-    // SPA처럼 다른 org/route로 전환할 때 사용.
-    async function switchRoute({ orgId, routeId }) {
-      CONFIG = { ...CONFIG, orgId, routeId }; 
-      ENDPOINTS = makeEndpoints(CONFIG);   
-      clearInterval(pollTimer);
+    document.addEventListener('DOMContentLoaded', async()=>{
       await bootstrap();
-      startPolling(20000);
-    }
-    // window.switchRoute = switchRoute; // 필요 시 전역 공개
-
-    // 부트스트랩
-    document.addEventListener('DOMContentLoaded', async () => {
-      try {
-        await bootstrap();
-        startPolling(20000);
-      } catch (e) {
-        console.error('[bootstrap]', e);
-        if (lastStops) applyData({ stops: lastStops });
-      }
+      startPolling();
     });
   </script>
 </body>
