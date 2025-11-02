@@ -18,7 +18,8 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")  # 외부 REST
 API_KEY = os.getenv("API_KEY", "")  # 필요 없다면 빈 값 유지
 
 # 임시(외부) 데이터 서버
-UPSTREAM_API_BASE = os.getenv("UPSTREAM_API_BASE", "http://zxcv.imagine.io.kr:9900")
+UPSTREAM_API_BASE = os.getenv("UPSTREAM_API_BASE", "https://shuttle-roid-894717980119.asia-northeast3.run.app/")
+UPSTREAM_API_BASE2 = os.getenv("UPSTREAM_API_BASE", "http://zxcv.imagine.io.kr:9900")
 TIMEOUT = float(os.getenv("UPSTREAM_TIMEOUT", "3.0"))
 
 app = FastAPI(title="ShuttlePassengerClient")
@@ -104,11 +105,11 @@ def _ensure_params(orgId: Optional[str], routeId: Optional[str]) -> None:
 # (A) 노선 메타
 @app.get("/meta")
 async def meta_proxy(orgId: str = Query(...), routeId: str = Query(...)):
-    url = f"{UPSTREAM_API_BASE}/meta"
-    logger.info(f"[proxy] -> GET {url} params={{'orgId': '{orgId}', 'routeId': '{routeId}'}}")
+    url = f"{UPSTREAM_API_BASE}/user/meta" if orgId == "1" else f"{UPSTREAM_API_BASE2}/meta"
+    logger.info(f"[proxy] -> GET {url} params={{'orgID': '{orgId}', 'routeID': '{routeId}'}}")
     try:
         assert client is not None, "HTTP client is not initialized"
-        r = await client.get(url, params={"orgId": orgId, "routeId": routeId}, timeout=TIMEOUT)
+        r = await client.get(url, params={"orgID": orgId, "routeID": routeId}, timeout=TIMEOUT)
         logger.info(f"[proxy] <- {r.status_code} from {url}")
         r.raise_for_status()
         return JSONResponse(r.json(), headers={"Cache-Control": "no-store"})
@@ -120,10 +121,10 @@ async def meta_proxy(orgId: str = Query(...), routeId: str = Query(...)):
 # (B) 정류소 목록
 @app.get("/stops")
 async def stops_proxy(orgId: str = Query(...), routeId: str = Query(...)):
-    url = f"{UPSTREAM_API_BASE}/stops"
+    url = f"{UPSTREAM_API_BASE}/user/stops" if orgId == "1" else f"{UPSTREAM_API_BASE2}/stops"
     try:
         assert client is not None, "HTTP client is not initialized"
-        r = await client.get(url, params={"orgId": orgId, "routeId": routeId}, timeout=TIMEOUT)
+        r = await client.get(url, params={"orgID": orgId, "routeID": routeId}, timeout=TIMEOUT)
         r.raise_for_status()
         return JSONResponse(r.json(), headers={"Cache-Control": "no-store"})
     except httpx.HTTPError as e:
@@ -133,10 +134,10 @@ async def stops_proxy(orgId: str = Query(...), routeId: str = Query(...)):
 # (C) 차량 목록
 @app.get("/vehicles")
 async def vehicles_proxy(orgId: str = Query(...), routeId: str = Query(...)):
-    url = f"{UPSTREAM_API_BASE}/vehicles"
+    url = f"{UPSTREAM_API_BASE}/user/vehicles" if orgId == "1" else f"{UPSTREAM_API_BASE2}/vehicles"
     try:
         assert client is not None, "HTTP client is not initialized"
-        r = await client.get(url, params={"orgId": orgId, "routeId": routeId}, timeout=TIMEOUT)
+        r = await client.get(url, params={"orgID": orgId, "routeID": routeId}, timeout=TIMEOUT)
         r.raise_for_status()
         return JSONResponse(r.json(), headers={"Cache-Control": "no-store"})
     except httpx.HTTPError as e:
@@ -147,11 +148,11 @@ async def vehicles_proxy(orgId: str = Query(...), routeId: str = Query(...)):
 #     외부 서버 규약: GET /routes?orgId=...
 @app.get("/routes-data")
 async def routes_data_proxy(orgId: str = Query(...)):
-    url = f"{UPSTREAM_API_BASE}/routes"
-    logger.info(f"[proxy] -> GET {url} params={{'orgId': '{orgId}'}}")
+    url = f"{UPSTREAM_API_BASE}/user/route-list" if orgId == "1" else f"{UPSTREAM_API_BASE2}/routes"
+    logger.info(f"[proxy] -> GET {url} params={{'orgID': '{orgId}'}}")
     try:
         assert client is not None, "HTTP client is not initialized"
-        r = await client.get(url, params={"orgId": orgId}, timeout=TIMEOUT)
+        r = await client.get(url, params={"orgID": orgId}, timeout=TIMEOUT)
         logger.info(f"[proxy] <- {r.status_code} from {url}")
         r.raise_for_status()
         # 외부가 배열 혹은 {routes:[...]} 모두 수용
@@ -170,7 +171,7 @@ async def routes_data_proxy(orgId: str = Query(...)):
 #     외부 서버 규약: GET /orgs  (옵션: ?q=검색어 등)
 @app.get("/orgs-data")
 async def orgs_data_proxy(q: Optional[str] = Query(None)):
-    url = f"{UPSTREAM_API_BASE}/orgs"
+    url = f"{UPSTREAM_API_BASE2}/user/orgs"
     params: Dict[str, Any] = {}
     if q:
         params["q"] = q
