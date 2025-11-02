@@ -76,5 +76,4 @@ jobs:
         id: deploy-to-webapp
         with:
           app-name: 'shuttle-test'
-          slot-name: 'Production'
           
