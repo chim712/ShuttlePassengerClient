@@ -26,7 +26,7 @@
       position: sticky;
       top: 0;
       z-index: 10;
-      background: var(--card); /* ← 여기만 변경! 기존: var(--bg) */
+      background: var(--card); /* 헤더 흰 배경 */
       border-bottom: 1px solid var(--border);
     }
     .header-inner {
@@ -66,15 +66,15 @@
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      min-width:50px; /* 최소 너비 */
+      min-width:50px;
       height:36px;
-      padding:0 10px; /* 양 옆 여백 */
+      padding:0 10px;
       border-radius:8px;
       background:var(--accent);
       color:#fff;
       font-size:27px;
       font-weight:600;
-      white-space:nowrap; /* 줄바꿈 방지 */
+      white-space:nowrap;
     }
 
     .header-title { display:flex; flex-direction:column; gap:2px; }
@@ -202,110 +202,153 @@
   </template>
 
   <script>
-    const $ = (sel, root=document) => root.querySelector(sel);
+    const $  = (sel, root=document) => root.querySelector(sel);
     const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
 
+    // ---- 공통 유틸 ----
+    function normalizeId(id){ return String(id).trim(); }
+    function statusOffset(raw){
+      const s = String(raw||'').toLowerCase();
+      if (s === 'approach'   || s === '접근')  return -18;
+      if (s === 'departure'  || s === '출발')  return  18;
+      if (s === 'arrival'    || s === 'arrive' || s === '도착' || s === '정차') return 0;
+      return 0;
+    }
+    function getRowPx(){
+      // CSS var --row 가 "56px" 형태일 수 있으므로 숫자 추출
+      const v = getComputedStyle(document.documentElement).getPropertyValue('--row');
+      const n = parseInt(v, 10);
+      return Number.isFinite(n) ? n : 56;
+    }
+
+    // ---- 초기 파라미터 파싱 ----
     function parseConfig(){
-      const fromServer=window.INIT_CONFIG||{};
-      const sp=new URLSearchParams(location.search);
-      let orgId=fromServer.orgId??sp.get('orgId')??'1';
-      let routeId=fromServer.routeId??sp.get('routeId')??'1';
-      return {orgId,routeId};
+      const fromServer = window.INIT_CONFIG || {};
+      const sp = new URLSearchParams(location.search);
+      const orgId   = fromServer.orgId   ?? sp.get('orgId')   ?? '1';
+      const routeId = fromServer.routeId ?? sp.get('routeId') ?? '1';
+      return { orgId, routeId };
     }
-    const {orgId,routeId}=parseConfig();
-    const credentials=(new URLSearchParams(location.search).get('cred')==='include')?'include':'same-origin';
-    let CONFIG={orgId,routeId,credentials};
+    const { orgId, routeId } = parseConfig();
+    const credentials = (new URLSearchParams(location.search).get('cred') === 'include') ? 'include' : 'same-origin';
+    let CONFIG = { orgId, routeId, credentials };
 
-    function makeEndpoints({orgId,routeId}){
-      const qs=`?orgId=${encodeURIComponent(orgId)}&routeId=${encodeURIComponent(routeId)}`;
-      return {meta:`/meta${qs}`,stops:`/stops${qs}`,vehicles:`/vehicles${qs}`};
+    function makeEndpoints({orgId, routeId}){
+      const qs = `?orgId=${encodeURIComponent(orgId)}&routeId=${encodeURIComponent(routeId)}`;
+      return {
+        meta:     `/meta${qs}`,
+        stops:    `/stops${qs}`,
+        vehicles: `/vehicles${qs}`
+      };
     }
-    let ENDPOINTS=makeEndpoints(CONFIG);
+    let ENDPOINTS = makeEndpoints(CONFIG);
 
-    async function fetchJSON(url,{signal}={}) {
-      const res=await fetch(url,{signal,cache:'no-cache',credentials:CONFIG.credentials});
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    // ---- 네트워크 ----
+    async function fetchJSON(url, {signal} = {}){
+      const res = await fetch(url, { signal, cache:'no-cache', credentials: CONFIG.credentials });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     }
 
+    // ---- 렌더러 ----
     function renderMeta(m){
       if(!m) return;
-      $('#routeNumber').textContent=m.routeNumber??'–';
-      $('#directionLabel').textContent=m.directionLabel??'–';
-      $('#routeTitle').textContent=m.routeTitle??'–';
-      $('#serviceArea').textContent=m.serviceArea??'–';
-      $('#firstTime').textContent=m.firstTime??'–';
-      $('#lastTime').textContent=m.lastTime??'–';
-      $('#intervalText').textContent=m.intervalText??'–';
-      $('#fleetCount').textContent=m.fleetCount??'–';
-      $('#asOf').textContent=m.asOf??'–';
+      $('#routeNumber').textContent = m.routeNumber ?? '–';
+      $('#directionLabel').textContent = m.directionLabel ?? '–';
+      $('#routeTitle').textContent = m.routeTitle ?? '–';
+      $('#serviceArea').textContent = m.serviceArea ?? '–';
+      $('#firstTime').textContent = m.firstTime ?? '–';
+      $('#lastTime').textContent = m.lastTime ?? '–';
+      $('#intervalText').textContent = m.intervalText ?? '–';
+      $('#fleetCount').textContent = m.fleetCount ?? '–';
+      $('#asOf').textContent = m.asOf ?? '–';
     }
 
     function renderStops(stops){
       if(!Array.isArray(stops)) return;
-      const list=$('#stopList'), dots=$('#laneDots');
-      list.innerHTML=''; dots.innerHTML='';
-      const tpl=$('#tpl-stop');
+      const list = $('#stopList'), dots = $('#laneDots');
+      list.innerHTML = ''; dots.innerHTML = '';
+      const tpl = $('#tpl-stop');
+
       stops.forEach((s,i)=>{
-        const node=tpl.content.cloneNode(true);
-        node.querySelector('.js-stop-name').textContent=s.name??'';
-        node.querySelector('.js-stop-desc').textContent=s.desc??`정류장 ID ${s.id}`;
-        node.querySelector('.stop-row').dataset.stopId=s.id;
+        const node = tpl.content.cloneNode(true);
+        node.querySelector('.js-stop-name').textContent = s.name ?? '';
+        node.querySelector('.js-stop-desc').textContent = s.desc ?? `정류장 ID ${s.id}`;
+        node.querySelector('.stop-row').dataset.stopId = normalizeId(s.id);
         list.appendChild(node);
-        const dot=document.createElement('div');
-        dot.className='dot-abs';
-        dot.style.top=`calc(${i} * var(--row) + (var(--row)/2) - 8px)`;
+
+        const dot = document.createElement('div');
+        dot.className = 'dot-abs';
+        dot.style.top = `calc(${i} * var(--row) + (var(--row)/2) - 8px)`;
         dots.appendChild(dot);
       });
-      $('.lane').style.height=`calc(${stops.length} * var(--row))`;
+
+      $('.lane').style.height = `calc(${stops.length} * var(--row))`;
     }
 
     function renderVehicles(vehicles){
       if(!Array.isArray(vehicles)) return;
-      $('#laneVehicles').innerHTML='';
-      $$('.vehno').forEach(el=>el.remove());
-      const lv=$('#laneVehicles');
-      const stopIndexById=new Map();
-      $$('#stopList .stop-row').forEach((el,idx)=>stopIndexById.set(parseInt(el.dataset.stopId),idx));
-      const row=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--row'))||56;
 
-      vehicles.forEach(v=>{
-        const idx=stopIndexById.get(parseInt(v.stopId));
-        if(idx===undefined) return;
-        const base=idx*row+row/2;
-        const status=(v.status||'').toLowerCase();
-        const offset=status==='approach'||status==='접근'?-18:status==='departure'||status==='출발'?18:0;
+      // 컨테이너 초기화
+      $('#laneVehicles').innerHTML = '';
+      $$('.vehno').forEach(el => el.remove());
 
-        const bus=document.createElement('div');
-        bus.className='vbus';
-        bus.style.top=`${base+offset-11}px`;
+      const lv = $('#laneVehicles');
+
+      // 정류장 인덱스 매핑 (문자열 키로 통일)
+      const stopIndexById = new Map();
+      $$('#stopList .stop-row').forEach((el, idx) => {
+        stopIndexById.set(normalizeId(el.dataset.stopId), idx);
+      });
+
+      const row = getRowPx();
+
+      vehicles.forEach(v => {
+        const idx = stopIndexById.get(normalizeId(v.stopId));
+        if (idx === undefined) return;
+
+        const base = idx * row + row / 2;
+        const offset = statusOffset(v.status);
+
+        // 버스 박스
+        const bus = document.createElement('div');
+        bus.className = 'vbus';
+        bus.style.top = `${base + offset - 11}px`;
         lv.appendChild(bus);
 
-        const label=document.createElement('span');
-        label.className='vehno';
-        label.textContent=v.vehicleNo||'';
-        label.style.top=`${base+offset-7}px`;
+        // 차량번호 라벨
+        const label = document.createElement('span');
+        label.className = 'vehno';
+        label.textContent = v.vehicleNo || '';
+        label.style.top = `${base + offset - 7}px`;
         $('.lane').appendChild(label);
       });
 
-      $('#fleetCount').textContent=vehicles.length;
-      $('#asOf').textContent=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+      $('#fleetCount').textContent = vehicles.length;
+      $('#asOf').textContent = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
     }
 
-    async function loadMeta(){ try{ renderMeta(await fetchJSON(ENDPOINTS.meta)); }catch(e){console.error(e);} }
-    async function loadStops(){ try{
-      const data=await fetchJSON(ENDPOINTS.stops);
-      renderStops(Array.isArray(data)?data:data.stops);
-    }catch(e){console.error(e);} }
-    async function loadVehicles(){ try{
-      const data=await fetchJSON(ENDPOINTS.vehicles);
-      renderVehicles(Array.isArray(data)?data:data.vehicles);
-    }catch(e){console.error(e);} }
+    // ---- 로드 & 폴링 ----
+    async function loadMeta(){ try { renderMeta(await fetchJSON(ENDPOINTS.meta)); } catch(e){ console.error(e); } }
+    async function loadStops(){ try {
+      const data = await fetchJSON(ENDPOINTS.stops);
+      renderStops(Array.isArray(data) ? data : data.stops);
+    } catch(e){ console.error(e); } }
+    async function loadVehicles(){ try {
+      const data = await fetchJSON(ENDPOINTS.vehicles);
+      renderVehicles(Array.isArray(data) ? data : data.vehicles);
+    } catch(e){ console.error(e); } }
 
-    async function bootstrap(){ await loadMeta(); await loadStops(); await loadVehicles(); }
-    function startPolling(ms=20000){ setInterval(loadVehicles,ms); }
+    async function bootstrap(){
+      await loadMeta();
+      await loadStops();
+      await loadVehicles();
+    }
+    function startPolling(ms=20000){
+      setInterval(loadVehicles, ms);
+    }
 
-    document.addEventListener('DOMContentLoaded', async()=>{
+    document.addEventListener('DOMContentLoaded', async ()=>{
       await bootstrap();
       startPolling();
     });
